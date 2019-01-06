@@ -1,4 +1,11 @@
 module Cube
+# TODO:
+#   1. Implement full code rotations, X, Y, Z from
+#      https://ruwix.com/the-rubiks-cube/notation/.
+#   2. Add shortcute functions based on letter moves.
+#   3. Implement tree search from AI book on Kindle.  Although it will only probably find
+#      the solution when the cube is not too shuffled due to run time.
+#
 
 """
     MagicCube(n)
