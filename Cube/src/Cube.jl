@@ -1,11 +1,14 @@
 module Cube
 # TODO:
-#   1. Implement full code rotations, X, Y, Z from
-#      https://ruwix.com/the-rubiks-cube/notation/.
-#   2. Add shortcute functions based on letter moves.
-#   3. Implement tree search from AI book on Kindle.  Although it will only probably find
+#   0. Implement solved check for MagicCube.
+#   1. Implement tree search from AI book on Kindle.  Although it will only probably find
 #      the solution when the cube is not too shuffled due to run time.
+#   2. Run simple benchmark for increasing shuffles n values to see how long simple searches
+#      require to solve.
 #
+
+using DataStructures: Queue, enqueue!, dequeue!
+
 
 """
     MagicCube(n)
@@ -94,7 +97,7 @@ function adjacent_slice_values(cube::MagicCube, face::Int, layer::Int)
     hcat([cube.faces[r, c, f] for (r, c, f) in zip(rows, cols, faces)]...)
 end
 
-function rotate_clockwise!(cube::MagicCube, face::Int)
+function face_clockwise!(cube::MagicCube, face::Int)
     face_values = @view cube.faces[:, :, face]
     edge_values = adjacent_edge_values(cube, face)
 
@@ -112,12 +115,12 @@ function rotate_clockwise!(cube::MagicCube, face::Int)
     cube
 end
 
-function rotate_clockwise(cube::MagicCube, face::Int)
+function face_clockwise(cube::MagicCube, face::Int)
     newcube = MagicCube(cube)
-    rotate_clockwise!(newcube, face)
+    face_clockwise!(newcube, face)
 end
 
-function rotate_counterclockwise!(cube::MagicCube, face::Int)
+function face_counterclockwise!(cube::MagicCube, face::Int)
     face_values = @view cube.faces[:, :, face]
     edge_values = adjacent_edge_values(cube, face)
 
@@ -135,9 +138,9 @@ function rotate_counterclockwise!(cube::MagicCube, face::Int)
     cube
 end
 
-function rotate_counterclockwise(cube::MagicCube, face::Int)
+function face_counterclockwise(cube::MagicCube, face::Int)
     newcube = MagicCube(cube)
-    rotate_counterclockwise!(newcube, face)
+    face_counterclockwise!(newcube, face)
 end
 
 """
@@ -150,9 +153,9 @@ layer ``n`` is the same as ``rotate_counterclockwise!(cube, opposite_face[face])
 """
 function slice_clockwise!(cube::MagicCube, face::Int, layer::Int)
     if layer == 1
-        return rotate_clockwise!(cube, face)
+        return face_clockwise!(cube, face)
     elseif layer == cube.n
-        return rotate_counterclockwise!(cube, opposite_face[face])
+        return face_counterclockwise!(cube, opposite_face[face])
     end
 
     slice_values = adjacent_slice_values(cube, face, layer)
@@ -176,9 +179,9 @@ end
 
 function slice_counterclockwise!(cube::MagicCube, face::Int, layer::Int)
     if layer == 1
-        return rotate_counterclockwise!(cube, face)
+        return face_counterclockwise!(cube, face)
     elseif layer == cube.n
-        return rotate_clockwise!(cube, opposite_face[face])
+        return face_clockwise!(cube, opposite_face[face])
     end
 
     slice_values = adjacent_slice_values(cube, face, layer)
@@ -198,6 +201,50 @@ end
 function slice_counterclockwise(cube::MagicCube, face::Int, layer::Int)
     newcube = MagicCube(cube)
     slice_counterclockwise!(newcube, face, layer)
+end
+
+"""
+    cube_clockwise!(cube, face)
+
+Rotate whole cube 90 degrees clockwise around the axis passing through `face` (orthogonal,
+or normal to it).
+
+"""
+function cube_clockwise!(cube::MagicCube, face::Int)
+    faces = adjacent_faces(Val(face))
+    tmp = cube.faces[:, :, faces[1]]
+    cube.faces[:, :, faces[1]] = cube.faces[:, :, faces[4]]
+    cube.faces[:, :, faces[4]] = cube.faces[:, :, faces[3]]
+    cube.faces[:, :, faces[3]] = cube.faces[:, :, faces[2]]
+    cube.faces[:, :, faces[2]] = tmp
+    cube
+end
+
+function cube_clockwise(cube::MagicCube, face::Int)
+    newcube = MagicCube(cube)
+    cube_clockwise!(newcube, face)
+end
+
+"""
+    cube_counterclockwise!(cube, face)
+
+Rotate whole cube 90 degrees counter-clockwise around the axis passing through `face` as you
+look at `face` (orthogonal, or normal to it).
+
+"""
+function cube_counterclockwise!(cube::MagicCube, face::Int)
+    faces = adjacent_faces(Val(face))
+    tmp = cube.faces[:, :, faces[1]]
+    cube.faces[:, :, faces[1]] = cube.faces[:, :, faces[2]]
+    cube.faces[:, :, faces[2]] = cube.faces[:, :, faces[3]]
+    cube.faces[:, :, faces[3]] = cube.faces[:, :, faces[4]]
+    cube.faces[:, :, faces[4]] = tmp
+    cube
+end
+
+function cube_counterclockwise(cube::MagicCube, face::Int)
+    newcube = MagicCube(cube)
+    cube_counterclockwise!(newcube, face)
 end
 
 
@@ -251,5 +298,88 @@ function _print_offset(n)
         print(" ")
     end
 end
+
+# Shortcut moves based on speed cube notation.  Slices default to assuming a MagicCube(3).
+L!(cube::MagicCube) = face_clockwise!(cube, 2)
+Lp!(cube::MagicCube) = face_counterclockwise!(cube, 2)
+R!(cube::MagicCube) = face_clockwise!(cube, 3)
+Rp!(cube::MagicCube) = face_counterclockwise!(cube, 3)
+U!(cube::MagicCube) = face_clockwise!(cube, 4)
+Up!(cube::MagicCube) = face_counterclockwise!(cube, 4)
+D!(cube::MagicCube) = face_clockwise!(cube, 5)
+Dp!(cube::MagicCube) = face_counterclockwise!(cube, 5)
+F!(cube::MagicCube) = face_clockwise!(cube, 1)
+Fp!(cube::MagicCube) = face_counterclockwise!(cube, 1)
+B!(cube::MagicCube) = face_clockwise!(cube, 6)
+Bp!(cube::MagicCube) = face_counterclockwise!(cube, 6)
+
+
+M!(cube::MagicCube, layer=2) = slice_clockwise!(cube, 2, layer)
+Mp!(cube::MagicCube, layer=2) = slice_counterclockwise!(cube, 2, layer)
+E!(cube::MagicCube, layer=2) = slice_clockwise!(cube, 5, layer)
+Ep!(cube::MagicCube, layer=2) = slice_counterclockwise!(cube, 5, layer)
+S!(cube::MagicCube, layer=2) = slice_clockwise!(cube, 1, layer)
+Sp!(cube::MagicCube, layer=2) = slice_counterclockwise!(cube, 1, layer)
+
+X!(cube::MagicCube) = cube_clockwise!(cube, 3)
+Xp!(cube::MagicCube) = cube_counterclockwise!(cube, 3)
+Y!(cube::MagicCube) = cube_clockwise!(cube, 4)
+Yp!(cube::MagicCube) = cube_counterclockwise!(cube, 4)
+Z!(cube::MagicCube) = cube_clockwise!(cube, 1)
+Zp!(cube::MagicCube) = cube_counterclockwise!(cube, 1)
+
+L(cube::MagicCube) = (newcube = MagicCube(cube); L!(newcube))
+Lp(cube::MagicCube) = (newcube = MagicCube(cube); Lp!(newcube))
+R(cube::MagicCube) = (newcube = MagicCube(cube); R!(newcube))
+Rp(cube::MagicCube) = (newcube = MagicCube(cube); Rp!(newcube))
+U(cube::MagicCube) = (newcube = MagicCube(cube); U!(newcube))
+Up(cube::MagicCube) = (newcube = MagicCube(cube); Up!(newcube))
+D(cube::MagicCube) = (newcube = MagicCube(cube); D!(newcube))
+Dp(cube::MagicCube) = (newcube = MagicCube(cube); Dp!(newcube))
+F(cube::MagicCube) = (newcube = MagicCube(cube); F!(newcube))
+Fp(cube::MagicCube) = (newcube = MagicCube(cube); Fp!(newcube))
+B(cube::MagicCube) = (newcube = MagicCube(cube); B!(newcube))
+Bp(cube::MagicCube) = (newcube = MagicCube(cube); Bp!(newcube))
+
+M(cube::MagicCube) = (newcube = MagicCube(cube); M!(newcube))
+Mp(cube::MagicCube) = (newcube = MagicCube(cube); Mp!(newcube))
+E(cube::MagicCube) = (newcube = MagicCube(cube); E!(newcube))
+Ep(cube::MagicCube) = (newcube = MagicCube(cube); Ep!(newcube))
+S(cube::MagicCube) = (newcube = MagicCube(cube); S!(newcube))
+Sp(cube::MagicCube) = (newcube = MagicCube(cube); Sp!(newcube))
+
+
+X(cube::MagicCube) = (newcube = MagicCube(cube); X!(newcube))
+Xp(cube::MagicCube) = (newcube = MagicCube(cube); Xp!(newcube))
+Y(cube::MagicCube) = (newcube = MagicCube(cube); Y!(newcube))
+Yp(cube::MagicCube) = (newcube = MagicCube(cube); Yp!(newcube))
+Z(cube::MagicCube) = (newcube = MagicCube(cube); Z!(newcube))
+Zp(cube::MagicCube) = (newcube = MagicCube(cube); Zp!(newcube))
+
+const POSSIBLE_MOVES! = [
+    L!, Lp!, R!, Rp!, U!, Up!, D!, Dp!, F!, Fp!, B!, Bp!, M!, Mp!, E!, Ep!,
+    S!, Sp!, X!, Xp!, Y!, Yp!, Z!, Zp!]
+const POSSIBLE_MOVES = [
+    L, Lp, R, Rp, U, Up, D, Dp, F, Fp, B, Bp, M, Mp, E, Ep,
+    S, Sp, X, Xp, Y, Yp, Z, Zp]
+
+
+function shuffle!(cube::MagicCube, n=3)
+    moves = rand(POSSIBLE_MOVES!, n)
+    for m! in moves
+        m!(cube)
+    end
+    cube
+end
+
+function shuffle(cube::MagicCube, n=3)
+    newcube = MagicCube(cube)
+    shuffle!(cube, n)
+end
+
+# function tree_search(cube:MagicCube)
+#     frontier = Queue{MagicCube}()
+#     enqueue!(frontier, cube)
+# end
 
 end  # module Cube
