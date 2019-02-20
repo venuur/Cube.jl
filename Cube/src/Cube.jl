@@ -377,6 +377,23 @@ function shuffle(cube::MagicCube, n=3)
     shuffle!(cube, n)
 end
 
+
+function solved(cube::MagicCube)
+    for i = 1:6
+        face_value = cube.faces[1, 1, i]
+        match = true
+        for col in 1:cube.n
+            for row in 1:cube.n
+                match &= face_value == cube.faces[row, col, i]
+            end
+        end
+        if !match
+            return false
+        end
+    end
+    return true
+end
+
 # function tree_search(cube:MagicCube)
 #     frontier = Queue{MagicCube}()
 #     enqueue!(frontier, cube)
