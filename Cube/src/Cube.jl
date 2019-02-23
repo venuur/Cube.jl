@@ -9,6 +9,8 @@ module Cube
 
 using DataStructures: Queue, enqueue!, dequeue!
 
+import Base.iterate
+
 
 """
     MagicCube(n)
@@ -356,9 +358,15 @@ Yp(cube::MagicCube) = (newcube = MagicCube(cube); Yp!(newcube))
 Z(cube::MagicCube) = (newcube = MagicCube(cube); Z!(newcube))
 Zp(cube::MagicCube) = (newcube = MagicCube(cube); Zp!(newcube))
 
+const SUCESSOR_MOVES! = [
+    L!, Lp!, R!, Rp!, U!, Up!, D!, Dp!, F!, Fp!, B!, Bp!, M!, Mp!, E!, Ep!,
+    S!, Sp!]
 const POSSIBLE_MOVES! = [
     L!, Lp!, R!, Rp!, U!, Up!, D!, Dp!, F!, Fp!, B!, Bp!, M!, Mp!, E!, Ep!,
     S!, Sp!, X!, Xp!, Y!, Yp!, Z!, Zp!]
+const SUCESSOR_MOVES = [
+    L, Lp, R, Rp, U, Up, D, Dp, F, Fp, B, Bp, M, Mp, E, Ep,
+    S, Sp]
 const POSSIBLE_MOVES = [
     L, Lp, R, Rp, U, Up, D, Dp, F, Fp, B, Bp, M, Mp, E, Ep,
     S, Sp, X, Xp, Y, Yp, Z, Zp]
@@ -392,6 +400,56 @@ function solved(cube::MagicCube)
         end
     end
     return true
+end
+
+"""
+    MagicCubeIterState(cube)
+
+Iterator over cube configurations reachable by one move excluding whole cube
+rotations.
+
+"""
+mutable struct MagicCubeIterState
+    next_face::Int
+    next_layer::Int
+    next_clockwise::Bool
+
+    MagicCubeIterState() = new(1, 1, true)    
+end
+
+# Only need three of six faces because we can do clockwise and counterclockwise rotations.
+const ITERATE_FACE_SEQUENCE = [1, 2, 4]
+
+Base.iterate(cube::MagicCube) = (state = MagicCubeIterState(); iterate(cube, state))
+
+function Base.iterate(cube::MagicCube, state::MagicCubeIterState)
+    newcube = MagicCube(cube)
+
+    # For each face, iterate all slices.
+    if state.next_layer <= cube.n
+        next_face = ITERATE_FACE_SEQUENCE[state.next_face]
+        if state.next_clockwise
+            slice_clockwise!(newcube, next_face, state.next_layer)
+            state.next_clockwise = false
+        else
+            slice_counterclockwise!(newcube, next_face, state.next_layer)
+            state.next_clockwise = true
+            state.next_layer += 1
+        end
+    else
+        state.next_layer = 1
+        state.next_face += 1
+        if state.next_face <= 3
+            next_face = ITERATE_FACE_SEQUENCE[state.next_face]
+            # Since we just moved to a new face, we can guarantee clockwise is next.
+            slice_clockwise!(newcube, next_face, state.next_layer)
+            state.next_clockwise = false     
+        else
+            return nothing
+        end
+    end    
+
+    newcube, state
 end
 
 # function tree_search(cube:MagicCube)
