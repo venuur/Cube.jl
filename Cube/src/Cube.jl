@@ -373,7 +373,7 @@ const POSSIBLE_MOVES = [
 
 
 function shuffle!(cube::MagicCube, n=3)
-    moves = rand(POSSIBLE_MOVES!, n)
+    moves = rand(SUCESSOR_MOVES!, n)
     for m! in moves
         m!(cube)
     end
@@ -382,7 +382,7 @@ end
 
 function shuffle(cube::MagicCube, n=3)
     newcube = MagicCube(cube)
-    shuffle!(cube, n)
+    shuffle!(newcube, n)
 end
 
 
@@ -420,13 +420,17 @@ end
 # Only need three of six faces because we can do clockwise and counterclockwise rotations.
 const ITERATE_FACE_SEQUENCE = [1, 2, 4]
 
-Base.iterate(cube::MagicCube) = (state = MagicCubeIterState(); iterate(cube, state))
+struct OneTurnNeighbors
+    cube::MagicCube
+end
 
-function Base.iterate(cube::MagicCube, state::MagicCubeIterState)
-    newcube = MagicCube(cube)
+Base.iterate(neighbors::OneTurnNeighbors) = (state = MagicCubeIterState(); iterate(neighbors, state))
+
+function Base.iterate(neighbors::OneTurnNeighbors, state::MagicCubeIterState)
+    newcube = MagicCube(neighbors.cube)
 
     # For each face, iterate all slices.
-    if state.next_layer <= cube.n
+    if state.next_layer <= newcube.n
         next_face = ITERATE_FACE_SEQUENCE[state.next_face]
         if state.next_clockwise
             slice_clockwise!(newcube, next_face, state.next_layer)
@@ -452,9 +456,45 @@ function Base.iterate(cube::MagicCube, state::MagicCubeIterState)
     newcube, state
 end
 
-# function tree_search(cube:MagicCube)
-#     frontier = Queue{MagicCube}()
-#     enqueue!(frontier, cube)
-# end
+function tree_search(cube::MagicCube, max_iter=1000)
+    frontier = Queue{MagicCube}()
+    enqueue!(frontier, cube)
+    for i in 1:max_iter
+        (length(frontier) == 0) && return nothing
+        leaf = dequeue!(frontier)
+        if solved(leaf) 
+            println("Solved in $i iterations.")
+            return leaf
+        end
+        for node in OneTurnNeighbors(leaf)
+            enqueue!(frontier, node)
+        end
+    end
+end
+
+
+function graph_search(cube::MagicCube, max_iter=1000)
+    frontier = Queue{MagicCube}()
+    frontier_set = Set{MagicCube}()
+    explored = Set{MagicCube}()
+    push!(frontier_set, cube)
+    enqueue!(frontier, cube)
+    for i in 1:max_iter
+        (length(frontier) == 0) && return nothing
+        leaf = dequeue!(frontier)
+        delete!(frontier_set, leaf)
+        if solved(leaf) 
+            println("Solved in $i iterations.")
+            return leaf
+        end
+        push!(explored, leaf)
+        for node in OneTurnNeighbors(leaf)
+            if node ∉ explored && node ∉ frontier_set
+                push!(frontier_set, node)
+                enqueue!(frontier, node)
+            end
+        end
+    end
+end
 
 end  # module Cube
